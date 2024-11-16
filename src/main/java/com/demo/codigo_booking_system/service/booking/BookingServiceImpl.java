@@ -26,7 +26,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
 
-    // private final RedisTemplate<String, Integer> redisTemplate;
+//    private final RedisTemplate<String, Integer> redisTemplate;
 
     private final UserRepository userRepository;
 
@@ -38,77 +38,55 @@ public class BookingServiceImpl implements BookingService {
 
     private final WaitListService waitListService;
 
+
     @Override
     public String doBooking(String email, Long classId) {
-//        User user = userRepository.findUserByEmail(email)
-//                .stream().findFirst()
-//                .orElseThrow(() -> new UserNotFoundException("User was not found"));
-//
-//        ClassSchedule classSchedule = classScheduleService.findClassById(classId);
-//
-//        String redisKey = "class:" + classId + ":availableSlots";
-//        ValueOperations<String, Integer> valueOps = redisTemplate.opsForValue();
-//        Integer availableSlots = valueOps.get(redisKey);
-//
-//        if (availableSlots == null || availableSlots <= 0) {
-//            return "No available slots for this class.";
-//        }
-//        boolean isBooked = false;
-//
-//        Optional<Packages> userPackage = Optional.empty();
-//        for (Packages pkg : user.getPackages()) {
-//            if (pkg.getCountry().equalsIgnoreCase(classSchedule.getCountry()) &&
-//                    pkg.getCredits() >= classSchedule.getRequiredCredits()) {
-//                userPackage = Optional.of(pkg);
-//                break;
-//            }
-//        }
-//
-//        try{
-//            redisTemplate.watch(redisKey);
-//            if (valueOps.get(redisKey) > 0) {
-//                redisTemplate.multi();
-//                valueOps.decrement(redisKey);
-//                List<Object> result = redisTemplate.exec();
-//                if (result != null && !result.isEmpty()) {
-//                    Booking booking = new Booking();
-//                    booking.setUser(user);
-//                    booking.setBookedClass(classSchedule);
-//                    booking.setBookingTime(LocalDateTime.now());
-//                    bookingRepository.save(booking);
-//
-//                    userPackage.get().setCredits(userPackage.get().getCredits() - classSchedule.getRequiredCredits());
-//                    packageRepository.save(userPackage.get());
-//
-//                    classSchedule.setAvailableSlots(classSchedule.getAvailableSlots() - 1);
-//                    classSchedule.getBookings().add(booking);
-//                    classScheduleService.saveClass(classSchedule);
-//                    isBooked = true;
-//                }
-//            }
-//        }catch (Exception e){
-//            return "Booking failed due to a conflict.";
-//        }
-//
-//        if(userPackage.isEmpty()){
-//            throw new RuntimeException("Insufficient credits or no valid package available.");
-//        }else if(!user.getCountry().equals(classSchedule.getCountry())){
-//            throw new NotEligibleException("Not eligible to book this class | Country missmatch");
-//        }
-//        if (isBooked) {
-//
-//            return "Booking successful!";
-//        }else {
-//            Waitlist waitlist = new Waitlist();
-//            waitlist.setUser(user);
-//            waitlist.setWaitlistClass(classSchedule);
-//            waitlist.setWaitlistTime(LocalDateTime.now());
-//            waitListService.saveWaitList(waitlist);
-//
-//            classScheduleService.saveClass(classSchedule);
-//            return "No available slots, added to waitlist.";
-//        }
-        return null;
+        User user = userRepository.findUserByEmail(email)
+                .stream().findFirst()
+                .orElseThrow(() -> new UserNotFoundException("User was not found"));
+
+        ClassSchedule classSchedule = classScheduleService.findClassById(classId);
+
+        Optional<Packages> userPackage = Optional.empty();
+        for (Packages pkg : user.getPackages()) {
+            if (pkg.getCountry().equalsIgnoreCase(classSchedule.getCountry()) &&
+                    pkg.getCredits() >= classSchedule.getRequiredCredits()) {
+                userPackage = Optional.of(pkg);
+                break;
+            }
+        }
+
+        if(userPackage.isEmpty()){
+            throw new RuntimeException("Insufficient credits or no valid package available.");
+        }else if(!user.getCountry().equals(classSchedule.getCountry())){
+            throw new NotEligibleException("Not eligible to book this class | Country missmatch");
+        }
+
+        if (classSchedule.getAvailableSlots() > 0) {
+            Booking booking = new Booking();
+            booking.setUser(user);
+            booking.setBookedClass(classSchedule);
+            booking.setBookingTime(LocalDateTime.now());
+            bookingRepository.save(booking);
+
+            userPackage.get().setCredits(userPackage.get().getCredits() - classSchedule.getRequiredCredits());
+            packageRepository.save(userPackage.get());
+
+            classSchedule.setAvailableSlots(classSchedule.getAvailableSlots() - 1);
+            classSchedule.getBookings().add(booking);
+            classScheduleService.saveClass(classSchedule);
+
+            return "Booking Successfully";
+        }else {
+            Waitlist waitlist = new Waitlist();
+            waitlist.setUser(user);
+            waitlist.setWaitlistClass(classSchedule);
+            waitlist.setWaitlistTime(LocalDateTime.now());
+            waitListService.saveWaitList(waitlist);
+
+            classScheduleService.saveClass(classSchedule);
+            return "No available slots, added to waitlist.";
+        }
     }
 
     @Override
